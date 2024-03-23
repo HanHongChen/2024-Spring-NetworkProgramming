@@ -8,15 +8,18 @@
 #endif
 using namespace std;
 struct Job{
-    bool isPipe;
-    int *in;
-    int *out;
+    bool isPipe = false;
+    int *pipeIn = nullptr;
+    int *pipeOut = nullptr;
+    int in = -1;
+    int out = -1;
     vector<string> arg;
-    Job(){
-        isPipe = false;
-        in = NULL;
-        out = NULL;
-    }
+    // Job(){
+    //     isPipe = false;
+    // }
+    // ~Job(){
+    //     delete[] pipe;
+    // }
 };
 class Command {    
 private:
@@ -44,18 +47,18 @@ public:
 
     void print(){
         printf("isErrorPipe: %d, isNumPipe = %d, number = %d\n", isErrorPipe, isNumPipe, number);
-        printf("fd[0] = %d, fd[1] = %d, fd_in = %d, fd_out = %d, fd_err = %d\n", fd[0], fd[1], fd_in, fd_out, fd_err);
-        for(int i = 0; i < jobs.size(); i++){
-            Job job = jobs[i];
-            printf("Job %d : ", i);
-            printf("isPipe = %d ", job.isPipe);
-            // cout << "isPipe = " << true << " ";
-            printf("arg: ");
-            for(int j = 0; j < job.arg.size(); j++){
-                printf("%s ", job.arg[j].c_str());
-            }
-            printf("\n");
-        }
+        // printf("fd[0] = %d, fd[1] = %d, fd_in = %d, fd_out = %d, fd_err = %d\n", fd[0], fd[1], fd_in, fd_out, fd_err);
+        // for(int i = 0; i < jobs.size(); i++){
+        //     Job job = jobs[i];
+        //     printf("Job %d : ", i);
+        //     printf("isPipe = %d ", job.isPipe);
+        //     // cout << "isPipe = " << true << " ";
+        //     printf("arg: ");
+        //     for(int j = 0; j < job.arg.size(); j++){
+        //         printf("%s ", job.arg[j].c_str());
+        //     }
+        //     printf("\n");
+        // }
     }
     
     // void printJobs(){
