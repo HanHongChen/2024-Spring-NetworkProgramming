@@ -1,0 +1,4 @@
+gdb npshell.out
+break 288
+n
+display commands

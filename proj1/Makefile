@@ -9,8 +9,10 @@ npshell.out: npshell.cpp
 run: npshell.out
 	./npshell.out
 
-debug: clean run
-	$(CXX) $(CXXFLAGS) -o npshell.out npshell.cpp 
+debug: clean
+	$(CXX) $(CXXFLAGS) -g -o npshell.out npshell.cpp
 
+gdb: debug
+	gdb npshell.out
 clean:
 	rm -f npshell.out

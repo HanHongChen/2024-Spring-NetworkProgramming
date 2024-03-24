@@ -7,7 +7,12 @@
 #include <iostream>
 #endif
 using namespace std;
+struct NumPipe{
+    int number;
+    int *pipe;
+};
 struct Job{
+    pid_t pid;
     bool isPipe = false;
     int *pipeIn = nullptr;
     int *pipeOut = nullptr;
