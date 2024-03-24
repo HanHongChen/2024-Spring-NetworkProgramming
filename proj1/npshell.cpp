@@ -169,8 +169,8 @@ void exec(Job job){
     }
     args[job.arg.size()] = nullptr;
     if (execvp(args[0], args) == -1) {
-        perror("exec failed");
-        exit(1);
+        cerr << "Unknown command: [" << job.arg[0] << "]." << endl;
+        exit(-1);
     }
 }
 
@@ -243,6 +243,7 @@ int runCommand(){
 
                 if(commands[i].jobs[j].isPipe){
                     commands[i].jobs[j].pipeOut = pipeArray[j % 2];
+                    commands[i].jobs[j].out = pipeArray[j % 2][1];
                     if(pipe(pipeArray[j % 2]) == -1){
                         perror("pipe failed");
                         exit(1);
@@ -259,10 +260,11 @@ int runCommand(){
 #endif
                     
                     if(commands[i].jobs[j].pipeIn != nullptr){
-                        
                         close(commands[i].jobs[j].pipeIn[1]);
                         dup2(commands[i].jobs[j].pipeIn[0], STDIN_FILENO);
-                        close(commands[i].jobs[j].pipeIn[0]);
+                        // close(commands[i].jobs[j].pipeIn[1]);
+                        // dup2(commands[i].jobs[j].pipeIn[0], STDIN_FILENO);
+                        // close(commands[i].jobs[j].pipeIn[0]);
                     }
 
                     if(commands[i].jobs[j].pipeOut != nullptr){
