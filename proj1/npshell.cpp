@@ -19,9 +19,11 @@
 using namespace std;
 vector<Command> numberPipes;
 vector<int*> pipe_v;//讓main可以close
+
+vector<Job> extractJob(vector<string> tmp);
 void sigchld_handler(int sig){
     int status;
-    while (waitpid(-1, &status, WNOHANG) > 0) {
+    while (waitpid(-1, &status, 0) > 0) {
         // 處理子進程的退出
         if (WIFEXITED(status)) {
             //printf("child process ends. return：%d\n", WEXITSTATUS(status));
@@ -30,6 +32,17 @@ void sigchld_handler(int sig){
         }
     }
 
+}
+void waitChildProcesses(){
+    int status;
+    while (waitpid(-1, &status, 0) > 0) {
+        // 處理子進程的退出
+        if (WIFEXITED(status)) {
+            //printf("child process ends. return：%d\n", WEXITSTATUS(status));
+        } else if (WIFSIGNALED(status)) {
+            //printf("child process ended by signal. signal：%d\n", WTERMSIG(status));
+        }
+    }
 }
 vector<string> split(string str, string delimiter){
     vector<string> result;
@@ -43,58 +56,7 @@ vector<string> split(string str, string delimiter){
     result.push_back(str);
     return result;
 }
-vector<Job> extractJob(vector<string> tmp){
-    vector<Job> result;
-    Job job;
-    vector<string> arg;
-    cout << "tmp size = " << tmp.size() << endl;
-    if(tmp.size() == 1){
-        arg.push_back(tmp[0]);
-        job.arg = arg;
-        result.push_back(job);
-        return result;
-    }
-    int pipefd[2];
-    int *fdPtr = pipefd;
-    int count = 0;
-    
-    for(int i = 0; i < tmp.size(); i++){
 
-        if(tmp[i] == "|"){
-            job.isPipe = true;
-            job.arg = arg;
-            if(count > 0){
-                job.pipeIn = pipefd;
-                job.in = pipefd[0];
-            }
-            if(pipe(pipefd) == -1){
-                perror("pipe failed");
-                exit(1);
-            }
-            pipe_v.push_back(fdPtr);
-            job.pipeOut = pipefd;
-            job.out = pipefd[1];
-            
-            count++;
-            result.push_back(job);
-
-
-
-            //重新初始化
-            job = Job();
-            arg.clear();
-        }else{
-            arg.push_back(tmp[i]);
-        }
-    }
-    //最後一個job會因為沒有pipe了所以需要被存起來
-    if(arg.size() > 0){
-        job.arg = arg;
-        job.in = pipefd[0];
-        result.push_back(job);
-    }
-    return result;
-}
 void reviewNumPipe(){
     for(int i = 0; i < numberPipes.size(); i++){
         assert(numberPipes[i].isNumPipe);
@@ -182,17 +144,93 @@ void exec(Job job){
         args.push_back(const_cast<char*>(job.arg[i].c_str()));
     }
     args.push_back(NULL);
-    // if(job.in != -1){
+    // if(job.pipeIn != nullptr){
     //     dup2(job.in, STDIN_FILENO);
     // }
     // if(job.out != -1){
-        // dup2(job.out, STDOUT_FILENO);
+    //     dup2(job.out, STDOUT_FILENO);
     // }
-    cout << args[0] << " " << args.data() << endl;
+    if(job.pipeIn != nullptr){
+#ifndef DEBUG
+        cout << "exec中的pipeIn = " << job.pipeIn[0] << " " << job.pipeIn[1] << endl;
+#endif
+        dup2(job.in, STDIN_FILENO);
+    }
+    if(job.pipeOut != nullptr){
+#ifndef DEBUG
+        cout << "exec中的pipeOut = " << job.pipeOut[0] << " " << job.pipeOut[1] << endl;
+#endif
+        dup2(job.out, STDOUT_FILENO);
+    }
+    // cout << args[0] << " " << args.data() << endl;
     if(execvp(args[0], args.data())== -1){
         cerr << "Unknown command: [" << job.arg[0] << "]." << endl;
         exit(-1);
     }
+}
+
+vector<Job> extractJob(vector<string> tmp){
+    vector<Job> result;
+    Job job;
+    vector<string> arg;
+    if(tmp.size() == 1){
+        arg.push_back(tmp[0]);
+        job.arg = arg;
+        result.push_back(job);
+        return result;
+    }
+    // int pipefd[2];
+    // int *fdPtr = pipefd;
+    int count = 0;
+    
+    for(int i = 0; i < tmp.size(); i++){
+
+        if(tmp[i] == "|"){
+            int pipefd[2];
+            int *fdPtr = pipefd;
+            job.isPipe = true;
+            job.arg = arg;
+            if(count > 0){
+                job.pipeIn = pipe_v[count - 1];
+                job.in = job.pipeIn[0];//pipefd[0];
+                cout << "job.pipeIn[0]" << job.pipeIn[0] << "job.pipeIn[1]" << job.pipeIn[1] << "job.in = " << job.in << endl;
+            }
+            if(pipe(pipefd) == -1){
+                perror("pipe failed");
+                exit(1);
+            }
+            
+            cout << "fdPtr = " << fdPtr[0] << " " << fdPtr[1] << endl;
+            pipe_v.push_back(fdPtr);
+            job.pipeOut = pipefd;
+            job.out = job.pipeOut[1];
+            cout << "job.pipeOut[0] " << job.pipeOut[0] << " job.pipeOut[1] " << job.pipeOut[1] << " job.out = " << job.out << endl;
+
+            
+            count++;
+            result.push_back(job);
+
+
+
+            //重新初始化
+            job = Job();
+            arg.clear();
+        }else{
+            arg.push_back(tmp[i]);
+        }
+    }
+    //最後一個job會因為沒有pipe了所以需要被存起來
+    if(arg.size() > 0){
+        job.arg = arg;
+        job.pipeIn = pipe_v[count - 1];
+        job.in = job.pipeIn[0];
+        cout << "最後一個job.in = " << job.in << " job.pipeIn " << *job.pipeIn << endl;
+        result.push_back(job);
+    }
+    for(int i = 0; i < pipe_v.size(); i++){
+        cout << "pipe_v " << pipe_v[i][0] << " " << pipe_v[i][1] << endl;
+    }
+    return result;
 }
 int runCommand(){
     //讀取使用者輸入，command長度不超過256 chars
@@ -243,6 +281,9 @@ int runCommand(){
 #endif
         pid_t pid;
         // int pipeArray[2][2];
+        for(int k = 0; k < pipe_v.size(); k++){
+            cout << "close pipe -1 " << pipe_v[k][0] << " " << pipe_v[k][1] << endl;
+        }
         for(int i = 0; i < commands.size(); i++){
             Command cmd = commands[i];
             // vector<Job> jobs = cmd.jobs[i];
@@ -255,11 +296,16 @@ int runCommand(){
                     cout << cmd.jobs[j].arg[k] << " ";
                 }
                 cout << endl;
+                // cout << "pipeIn = " << cmd.jobs[j].pipeIn[0] << " " << cmd.jobs[j].pipeIn[1] << endl;
+                cout << "in = " << cmd.jobs[j].in << " out = " << cmd.jobs[j].out << endl;
 #endif
                 // if(j > 0){
                 //     jobs[j].in = pipeArray[(j - 1) % 2][0];
                 // }
                 Job job = cmd.jobs[j];
+                for(int k = 0; k < pipe_v.size(); k++){
+                    cout << "close pipe 0 " << pipe_v[k][0] << " " << pipe_v[k][1] << endl;
+                }
                 pid = fork();
                 if(pid < 0){
                     perror("fork failed");
@@ -270,22 +316,27 @@ int runCommand(){
                     cout << job.arg[0] << " in = " << job.in << " out = " << job.out << endl;
                     // cout << "pipeIn = " << job.pipeIn[0] << " " << job.pipeIn[1] << endl;
 #endif
-                    cout << "checkout pipein" << endl;
-                    if(job.pipeIn != nullptr){
-                        // close(job.pipeIn[1]);
-                        dup2(job.pipeIn[0], STDIN_FILENO);
-                    }
-                    cout << "checkout pipeout" << endl;
+                    // cout << "checkout pipein" << endl;
+                    // if(job.pipeIn != nullptr){
+                    //     // close(job.pipeIn[1]);
+                    //     dup2(job.pipeIn[0], STDIN_FILENO);
+                    // }
+                    // cout << "checkout pipeout" << endl;
 
-                    if(job.pipeOut != nullptr){
-                        // close(job.pipeOut[0]);
-                        dup2(job.pipeOut[1], STDOUT_FILENO);
+                    // if(job.pipeOut != nullptr){
+                    //     // close(job.pipeOut[0]);
+                    //     dup2(job.pipeOut[1], STDOUT_FILENO);
+                    // }
+                    for(int k = 0; k < pipe_v.size(); k++){
+                        cout << "close pipe1 " << pipe_v[k][0] << " " << pipe_v[k][1] << endl;
+                        // close(pipe_v[k][0]);
+                        // close(pipe_v[k][1]);
                     }
                     for(int k = 0; k < pipe_v.size(); k++){
+                        cout << "close pipe2 " << pipe_v[k][0] << " " << pipe_v[k][1] << endl;
                         close(pipe_v[k][0]);
                         close(pipe_v[k][1]);
                     }
-                    cout << "exec\n";
                     exec(job);
 
                 }
@@ -295,7 +346,8 @@ int runCommand(){
                     close(pipe_v[k][0]);
                     close(pipe_v[k][1]);
                 }
-                wait(NULL);
+                // wait(NULL);
+                waitChildProcesses();
                 cout << "% ";
             }
         }
@@ -316,11 +368,12 @@ int runCommand(){
     return 0;
 }
 int main(){
+    // signal(SIGCHLD, sigchld_handler);
+
     //預設PATH變數
     setenv("PATH", "bin:.", 1);
 
     runCommand();
-    // signal(SIGCHLD, sigchld_handler);
     
     return 0;
 }
