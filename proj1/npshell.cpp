@@ -13,15 +13,9 @@
 #include <string>
 #include <assert.h>
 #include "Command.cpp"
-
+//兩個Number pipe有問題
 #define DEBUG
-// int size = 256;
 using namespace std;
-// vector<Command> numPipes;
-// vector<int*> pipe_v;//讓main可以close
-
-vector<Job> extractJob(vector<string> tmp);
-
 vector<NumPipe> numPipes;
 
 int state;
@@ -61,18 +55,22 @@ vector<string> split(string str, string delimiter){
     return result;
 }
 
-int reviewNumPipe(){//因為寫入的時候已經把接到同指令的合併用同個pipe，所以只須考慮不同位置情況
+int reviewNumPipe(Command cmd){//因為寫入的時候已經把接到同指令的合併用同個pipe，所以只須考慮不同位置情況
     for(int i = 0; i < numPipes.size(); i++){
-        assert(numPipes[i].number > 0);//若<=0則有問題
-        numPipes[i].number = numPipes[i].number - 1;
-        if(numPipes[i].number == 0){
-            //怎麼處理?
+        // assert(numPipes[i].number > 0);//若<=0則有問題
+        if(numPipes[i].counting){
+            numPipes[i].number = numPipes[i].number - 1;
+            if(numPipes[i].number == 0){
 #ifndef NUMPIPE
-            cerr << __FILE__ << " " << __LINE__ << endl;
-            printf("numPipe[%d] = [%d, %d] is ready\n", i, numPipes[i].pipe[0], numPipes[i].pipe[1]);
+                cerr << __FILE__ << " " << __LINE__ << endl;
+                printf("numPipe[%d] = [%d, %d] is ready\n", i, numPipes[i].pipe[0], numPipes[i].pipe[1]);
 #endif
-            return i;
+                return i;
+            }
+        }else if((cmd.isErrorPipe || cmd.isNumPipe) && cmd.number == i){
+            numPipes[i].counting = true;
         }
+        
     }
     return -1; 
 }
@@ -124,8 +122,6 @@ vector<Command> extractCommand(vector<string> spaceSplit){
                 // //找完一個command存起來
                 result.push_back(command);
 
-                //找到新的command就更新現有number pipe
-                reviewNumPipe();
                 //reset
                 command = Command();
                 tmp.clear();
@@ -150,10 +146,6 @@ vector<Command> extractCommand(vector<string> spaceSplit){
     }
     //若有最後一個command則存起來
     if(tmp.size() > 0){
-        // vector<Job> jobs = extractJob(tmp);
-        // command.jobs = jobs;
-        // result.push_back(command);
-        // reviewNumPipe();
         Job jobs;
         jobs.arg = tmp;
         command.jobs.push_back(jobs);
@@ -215,27 +207,7 @@ int runCommand(){
         vector<string> spaceSplit = split(input, delimiter);
 
         //切command
-        vector<Command> commands = extractCommand(spaceSplit);
-        
-        // if(spaceSplit[0] == "setenv"){
-        //     if(spaceSplit.size() == 3){
-        //         setenv(spaceSplit[1].c_str(), spaceSplit[2].c_str(), 1);
-        //     }else{
-        //         printf("setenv: wrong number of arguments\n");
-        //     }
-        //     cout << "% ";
-        //     continue;
-        // }else if(spaceSplit[0] == "printenv"){
-        //     if(spaceSplit.size() == 2){
-        //         printf("%s\n", getenv(spaceSplit[1].c_str()));
-        //     }else{
-        //         printf("printenv: wrong number of arguments\n");
-        //     }
-        //     cout << "% ";
-        //     continue;
-        // }else if(spaceSplit[0] == "exit"){
-        //     exit(0);
-        // }
+        vector<Command> commands = extractCommand(spaceSplit);       
 
 #ifndef DEBUG
         cerr << __FILE__ << " " << __LINE__ << endl;
@@ -251,8 +223,7 @@ int runCommand(){
             // Command commands[i] = commands[i];
             // vector<Job> jobs = commands[i].jobs[i];
             //現有numPipes的記數-1
-
-
+            int numPipeIdx = reviewNumPipe(commands[i]);//這裡先扣的話會造成 ls |1 cat直接變成0
             //檢查是否為build in，是則跳過
             if(isBuildIn(commands[i].jobs[0]))
                 break;
@@ -268,9 +239,14 @@ int runCommand(){
                 cout << endl;
                 cout << "in = " << commands[i].jobs[j].in << " out = " << commands[i].jobs[j].out << endl;
 #endif
-                if(j > 0){
+                if(j > 0){//j>0表示一定有PIPE，因為ls , cat test.html各自為一個job
                     commands[i].jobs[j].pipeIn = pipeArray[(j - 1) % 2];
                     commands[i].jobs[j].in = pipeArray[(j - 1) % 2][0];
+                }
+
+                if(numPipeIdx != -1 && j == 0){//處理numPipe:有numberPipe且為第一個job，則此指令要接numPipe的as input
+                    commands[i].jobs[j].pipeIn = numPipes[numPipeIdx].pipe;
+                    commands[i].jobs[j].in = numPipes[numPipeIdx].pipe[1];
                 }
 
                 if(commands[i].jobs[j].isPipe){
@@ -282,10 +258,18 @@ int runCommand(){
                     }
                 }
 
+                if(commands[i].isNumPipe && j == commands[i].jobs.size() - 1){
+                    commands[i].jobs[j].pipeOut = numPipes[commands[i].number].pipe;
+                    commands[i].jobs[j].out = numPipes[commands[i].number].pipe[1];
+                }
+
                 pid = fork();
                 if(pid < 0){
                     perror("fork failed");
-                    exit(1);
+                    close(pipeArray[j % 2][0]);
+                    close(pipeArray[j % 2][1]);
+                    j--;
+                    continue;
                 }else if(pid == 0){
 #ifndef DEBUG
                     cerr << __FILE__ << " " << __LINE__ << endl;
@@ -311,6 +295,12 @@ int runCommand(){
                         close(pipeArray[(j - 1) % 2][0]);
                         close(pipeArray[(j - 1) % 2][1]);
                         
+                    }
+                    if(j == 0 && numPipeIdx != -1){
+                        close(numPipes[numPipeIdx].pipe[0]);
+                        close(numPipes[numPipeIdx].pipe[1]);
+                        //沒有刪掉會不會造成問題?
+                        // numPipes.erase(numPipes.begin() + numPipeIdx);
                     }
                     int cpid;
                     while ((cpid = wait(NULL)) > 0) {

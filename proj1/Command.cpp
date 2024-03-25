@@ -10,6 +10,7 @@ using namespace std;
 struct NumPipe{//global的存現有的number pipe
     int number;//計算還有幾步要丟出去
     int *pipe;//直接存pipe的fd
+    bool counting = false;
 };
 struct Job{
     pid_t pid;
