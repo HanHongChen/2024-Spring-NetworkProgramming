@@ -17,8 +17,8 @@
 #define DEBUG
 // int size = 256;
 using namespace std;
-vector<Command> numberPipes;
-vector<int*> pipe_v;//讓main可以close
+// vector<Command> numPipes;
+// vector<int*> pipe_v;//讓main可以close
 
 vector<Job> extractJob(vector<string> tmp);
 
@@ -61,17 +61,20 @@ vector<string> split(string str, string delimiter){
     return result;
 }
 
-void reviewNumPipe(){
-    for(int i = 0; i < numberPipes.size(); i++){
-        assert(numberPipes[i].isNumPipe);
-        numberPipes[i].number = numberPipes[i].number - 1;
-        if(numberPipes[i].number == 0){
+int reviewNumPipe(){//因為寫入的時候已經把接到同指令的合併用同個pipe，所以只須考慮不同位置情況
+    for(int i = 0; i < numPipes.size(); i++){
+        assert(numPipes[i].number > 0);//若<=0則有問題
+        numPipes[i].number = numPipes[i].number - 1;
+        if(numPipes[i].number == 0){
             //怎麼處理?
-            cout << "倒數完了\n" << endl;
-            numberPipes[i].print();
-             
+#ifndef NUMPIPE
+            cerr << __FILE__ << " " << __LINE__ << endl;
+            printf("numPipe[%d] = [%d, %d] is ready\n", i, numPipes[i].pipe[0], numPipes[i].pipe[1]);
+#endif
+            return i;
         }
     }
+    return -1; 
 }
 vector<Command> extractCommand(vector<string> spaceSplit){
     
@@ -93,8 +96,8 @@ vector<Command> extractCommand(vector<string> spaceSplit){
 
                 int find = 0;
                 //找現在有沒有相同的number pipe指向同個位置，如果有就用舊的pipe(j-th)即可不用重開
-                for(int j = 0; j < numberPipes.size(); j++){
-                    if(numberPipes[j].number == number){
+                for(int j = 0; j < numPipes.size(); j++){
+                    if(numPipes[j].number == number){
                         find = 1;
                         command.number = j;
                     }
@@ -120,7 +123,6 @@ vector<Command> extractCommand(vector<string> spaceSplit){
                 command.jobs.push_back(jobs);
                 // //找完一個command存起來
                 result.push_back(command);
-                // numberPipes.push_back(command);
 
                 //找到新的command就更新現有number pipe
                 reviewNumPipe();
@@ -174,6 +176,27 @@ void exec(Job job){
     }
 }
 
+bool isBuildIn(Job job){
+    if(job.arg[0] == "setenv"){
+        if(job.arg.size() == 3){
+            setenv(job.arg[1].c_str(), job.arg[2].c_str(), 1);
+        }else{
+            printf("setenv: wrong number of arguments\n");
+        }
+        return true;
+    }else if(job.arg[0] == "printenv"){
+        if(job.arg.size() == 2){
+            printf("%s\n", getenv(job.arg[1].c_str()));
+        }else{
+            printf("printenv: wrong number of arguments\n");
+        }
+        return true;
+    }else if(job.arg[0] == "exit"){
+        exit(0);
+    }
+    return false;
+}
+
 int runCommand(){
     //讀取使用者輸入，command長度不超過256 chars
     string input;
@@ -190,29 +213,30 @@ int runCommand(){
         //以空白分割
         string delimiter = " ";
         vector<string> spaceSplit = split(input, delimiter);
-        
-        if(spaceSplit[0] == "setenv"){
-            if(spaceSplit.size() == 3){
-                setenv(spaceSplit[1].c_str(), spaceSplit[2].c_str(), 1);
-            }else{
-                printf("setenv: wrong number of arguments\n");
-            }
-            cout << "% ";
-            continue;
-        }else if(spaceSplit[0] == "printenv"){
-            if(spaceSplit.size() == 2){
-                printf("%s\n", getenv(spaceSplit[1].c_str()));
-            }else{
-                printf("printenv: wrong number of arguments\n");
-            }
-            cout << "% ";
-            continue;
-        }else if(spaceSplit[0] == "exit"){
-            exit(0);
-        }
 
         //切command
         vector<Command> commands = extractCommand(spaceSplit);
+        
+        // if(spaceSplit[0] == "setenv"){
+        //     if(spaceSplit.size() == 3){
+        //         setenv(spaceSplit[1].c_str(), spaceSplit[2].c_str(), 1);
+        //     }else{
+        //         printf("setenv: wrong number of arguments\n");
+        //     }
+        //     cout << "% ";
+        //     continue;
+        // }else if(spaceSplit[0] == "printenv"){
+        //     if(spaceSplit.size() == 2){
+        //         printf("%s\n", getenv(spaceSplit[1].c_str()));
+        //     }else{
+        //         printf("printenv: wrong number of arguments\n");
+        //     }
+        //     cout << "% ";
+        //     continue;
+        // }else if(spaceSplit[0] == "exit"){
+        //     exit(0);
+        // }
+
 #ifndef DEBUG
         cerr << __FILE__ << " " << __LINE__ << endl;
         for(int i = 0; i < commands.size(); i++){
@@ -226,7 +250,15 @@ int runCommand(){
         for(int i = 0; i < commands.size(); i++){
             // Command commands[i] = commands[i];
             // vector<Job> jobs = commands[i].jobs[i];
-            for(int j = 0; j < commands[i].jobs.size(); j++){ 
+            //現有numPipes的記數-1
+
+
+            //檢查是否為build in，是則跳過
+            if(isBuildIn(commands[i].jobs[0]))
+                break;
+
+            for(int j = 0; j < commands[i].jobs.size(); j++){
+                
 #ifndef DEBUG
                 cerr << __FILE__ << " " << __LINE__ << endl;
                 cout << "Job " << j << " : ";
@@ -274,7 +306,6 @@ int runCommand(){
 
                     }
                     exec(commands[i].jobs[j]);
-                    exit(0 );
                 }else if (pid > 0){//父
                     if (j > 0){
                         close(pipeArray[(j - 1) % 2][0]);
