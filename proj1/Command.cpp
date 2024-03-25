@@ -10,15 +10,15 @@ using namespace std;
 struct NumPipe{//global的存現有的number pipe
     int number;//計算還有幾步要丟出去
     int *pipe;//直接存pipe的fd
-    bool counting = false;
+    // bool counting = false;
 };
 struct Job{
-    pid_t pid;
+    // pid_t pid;
     bool isPipe = false;
     int *pipeIn = nullptr;
     int *pipeOut = nullptr;
-    int in = -1;
-    int out = -1;
+    // int in = -1;
+    // int out = -1;
     vector<string> arg;
     // Job(){
     //     isPipe = false;
@@ -35,20 +35,21 @@ public:
     bool isNumPipe; //確認是否為number pipe
     int number; //若為nuber pipe，則number為存入NumPipe的index，即NumPipes的第i個是這個的pipe
     vector<Job> jobs; //指令，用|N or | or !分割的
-    int fd[2]; //pipe的fd
-    int fd_in; //pipe的輸入
-    int fd_out; //pipe的輸出
-    int fd_err; //pipe的錯誤
+    int *pipeIn = nullptr;
+    int *pipeOut = nullptr;
+    // int fd_in; //pipe的輸入
+    // int fd_out; //pipe的輸出
+    // int fd_err; //pipe的錯誤
     
     Command(){
         isErrorPipe = false;
         isNumPipe = false;
         number = -1;
-        fd[0] = -1;
-        fd[1] = -1;
-        fd_in = -1;
-        fd_out = -1;
-        fd_err = -1;
+        // fd[0] = -1;
+        // fd[1] = -1;
+        // fd_in = -1;
+        // fd_out = -1;
+        // fd_err = -1;
     }
 
     void print(){
