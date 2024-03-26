@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "syscall.h": "c",
+        "iostream": "cpp",
+        "fstream": "c",
+        "*.tcc": "c",
+        "numeric": "c",
+        "ostream": "c",
+        "sstream": "c",
+        "string_view": "cpp",
+        "regex": "cpp",
+        "iosfwd": "cpp",
+        "array": "cpp"
+    }
+}

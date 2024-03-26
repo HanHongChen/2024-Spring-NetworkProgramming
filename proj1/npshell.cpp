@@ -15,7 +15,7 @@
 #include "Command.cpp"
 //兩個Number pipe有問題
 #define NUMPIPE
-#define CLOSEPIPE
+// #define CLOSEPIPE
 // #define PIPE
 #define DEBUG
 using namespace std;
@@ -128,16 +128,18 @@ vector<Command> extractCommand(vector<string> spaceSplit){
                 //number pipe的時候要把tmp存入Job的arg中
                 // Job jobs;
                 jobs.arg = tmp;
-                command.jobs.push_back(jobs);
+                
                 if(numPipeIdx != -1){
 #ifndef NUMPIPE
                     cerr << __FILE__ << " " << __LINE__ << endl;
                     printf("pipeIn = [%d, %d]\n", numPipes[numPipeIdx].pipe[0], numPipes[numPipeIdx].pipe[1]);
 #endif
                     jobs.pipeIn = numPipes[numPipeIdx].pipe;
-                    // command.pipeIn = numPipes[numPipeIdx].pipe;
                     
+                    // command.pipeIn = numPipes[numPipeIdx].pipe;
+                    command.numberIn = numPipeIdx;
                 }
+                command.jobs.push_back(jobs);
                 // //找完一個command存起來
                 result.push_back(command);
 
@@ -166,7 +168,7 @@ vector<Command> extractCommand(vector<string> spaceSplit){
         int numPipeIdx = reviewNumPipe();
         if(numPipeIdx != -1){
             jobs.pipeIn = numPipes[numPipeIdx].pipe;
-            // command.pipeIn = numPipes[numPipeIdx].pipe;
+            command.numberIn = numPipeIdx;
         }
         command.jobs.push_back(jobs);
         result.push_back(command);
@@ -276,6 +278,7 @@ int runCommand(){
                 //     commands[i].jobs[j].out = numPipes[commands[i].number].pipe[1];
                 // }
                 //ls |1 number 到這裡的時候，number此job的pipeIn還是null，我存錯存到該command的pipeIn了=>看錯
+                
                 pid = fork();
                 if(pid < 0){
                     perror("fork failed");
@@ -301,10 +304,11 @@ int runCommand(){
                         cerr << "commands[i].jobs[j].pipeIn = [" << commands[i].jobs[j].pipeIn[0] << ", " << commands[i].jobs[j].pipeIn[1] << "]" << endl;
                         dup2(commands[i].jobs[j].pipeIn[0], STDIN_FILENO);
                         close(commands[i].jobs[j].pipeIn[0]);
-                        // close(commands[i].jobs[j].pipeIn[1]);
                         close(commands[i].jobs[j].pipeIn[1]);
-                        // dup2(commands[i].jobs[j].pipeIn[0], STDIN_FILENO);
-                        // close(commands[i].jobs[j].pipeIn[0]);
+                        if(commands[i].numberIn != -1){
+                            numPipes[commands[i].numberIn].finish = true;
+                        }
+                        
                     }
 
                     if(commands[i].jobs[j].pipeOut != nullptr){
@@ -327,18 +331,26 @@ int runCommand(){
                     cerr << __FILE__ << " " << __LINE__ << " parent 11111111" << endl;
 #endif
                     int numPipeIdx = returnNumPipesZeroIdx();
-                    cout << "numPipeIdx = " << numPipeIdx << endl;
-                    if(j == 0 && numPipeIdx != -1){//這裡close有問題???
+                    cout << "numPipeIdx = " << numPipeIdx <<" numPipes[numPipeIdx].finish = " << numPipes[numPipeIdx].finish << endl;
+                    // if(j == commands[i].jobs.size() && numPipeIdx != -1){//這裡close有問題???
+                    if(j == 0 && numPipeIdx != -1){
                         cerr << "closing numbered pipe" << endl;
+                        // close(numPipes[numPipeIdx].pipe[0]);
+                        close(numPipes[numPipeIdx].pipe[1]);//關numPipe的寫入端
+
+                        //沒有刪掉會不會造成問題?
+                        // numPipes.erase(numPipes.begin() + numPipeIdx);
+                    }
+                    while (wait(NULL) > 0);
+                    if(numPipeIdx != -1 && numPipes[numPipeIdx].finish){
                         close(numPipes[numPipeIdx].pipe[0]);
                         close(numPipes[numPipeIdx].pipe[1]);
-                        //沒有刪掉會不會造成問題?
                         // numPipes.erase(numPipes.begin() + numPipeIdx);
                     }
 #ifndef CLOSEPIPE
                     cerr << __FILE__ << " " << __LINE__ << " parent 2222222" << endl;
 #endif
-                    while (wait(NULL) > 0);
+                    // while (wait(NULL) > 0);
 
 #ifndef CLOSEPIPE
                     cerr << __FILE__ << " " << __LINE__ << " parent 3333333" << endl;
@@ -358,6 +370,22 @@ int runCommand(){
     
     clearenv();
     return 0;
+}
+
+void run(){
+    string input;
+    cout << "% ";
+    while(getline(cin, input)){
+        if(input == ""){
+            cout << "% ";
+            continue;
+        }
+
+        //以空白分割
+        string delimiter = " ";
+        vector<string> spaceSplit = split(input, delimiter);
+        
+    }
 }
 int main(){
     // signal(SIGCHLD, sigchld_handler);
