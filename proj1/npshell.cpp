@@ -14,6 +14,9 @@
 #include <string>
 #include <assert.h>
 #include "Command.cpp"
+// #include "util.cpp"
+// #include "Command.h"
+// #include "util.h"
 // #define COMMAND
 // #define NUMPIPE
 // #define CLOSEPIPE
@@ -52,14 +55,6 @@ vector<string> split(string str, string delimiter){
     result.push_back(str);
     return result;
 }
-int returnNumPipesZeroIdx(){
-    for(int i = 0; i < numPipes.size(); i++){
-        if(numPipes[i].step == 0){
-            return i;
-        }
-    }
-    return -1;
-}
 int reviewNumPipe(){//因為寫入的時候已經把接到同指令的合併用同個pipe，所以只須考慮不同位置情況
     int idx = -1;
     for(int i = 0; i < numPipes.size(); i++){
@@ -75,6 +70,73 @@ int reviewNumPipe(){//因為寫入的時候已經把接到同指令的合併用�
         
     }
     return idx; 
+}
+void buildNumberPipe(vector<Command> &commands, int cmdIndex){//使用參考所以這裡面對command作任何更動都相當於更動原本command
+    if(commands[cmdIndex].isNumPipe || commands[cmdIndex].isErrorPipe){
+
+        int find = 0;
+        //找現在有沒有相同的number pipe指向同個位置，如果有就用舊的pipe(j-th)即可不用重開
+        for(int numPipesIterator = 0; numPipesIterator < numPipes.size(); numPipesIterator++){
+            if(numPipes[numPipesIterator].step == commands[cmdIndex].number){
+                find = 1;
+                commands[cmdIndex].numPipesOutIdx = numPipesIterator;
+            }
+        }
+
+        //開number Pipe的pipe
+        if(find == 0){
+            NumPipe numPipe;
+            numPipe.pipe = new int[2];
+            if(pipe(numPipe.pipe) == -1){
+                perror("pipe failed");
+                exit(1);
+            }
+            numPipe.step = commands[cmdIndex].number;//這個存還有多少輪到我丟出去
+            numPipes.push_back(numPipe);
+            commands[cmdIndex].numPipesOutIdx = numPipes.size() - 1;//這個存在numPipes的
+            commands[cmdIndex].pipeOut = numPipe.pipe;
+        }
+    }
+
+}
+void setPipe(int (*pipeArray)[2], vector<Command> &commands, int cmdIndex, int jobIdx, int numPipeIdx){
+    //normal pipe的輸入
+    if(jobIdx > 0){
+        commands[cmdIndex].jobs[jobIdx].pipeIn = pipeArray[(jobIdx - 1) % 2];
+    }
+    //normal pipe的輸出
+    if(jobIdx != commands[cmdIndex].jobs.size() - 1){
+        commands[cmdIndex].jobs[jobIdx].pipeOut = pipeArray[jobIdx % 2];
+        if(pipe(pipeArray[jobIdx % 2]) == -1){
+            perror("pipe failed");
+            exit(1);
+        }
+    }
+    //number pipe的輸入
+    if(jobIdx == 0 && numPipeIdx != -1){
+        commands[cmdIndex].jobs[jobIdx].pipeIn = numPipes[numPipeIdx].pipe;
+    }
+    //number pipe的輸出
+    if(jobIdx == commands[cmdIndex].jobs.size() - 1 && (commands[cmdIndex].isNumPipe || commands[cmdIndex].isErrorPipe)){
+        commands[cmdIndex].jobs[jobIdx].pipeOut = numPipes[commands[cmdIndex].numPipesOutIdx].pipe;
+    }
+}
+void switchPipe(vector<Command> commands, int cmdIndex, int jobIdx){
+    if(commands[cmdIndex].jobs[jobIdx].pipeIn != nullptr){
+        dup2 (commands[cmdIndex].jobs[jobIdx].pipeIn[0], STDIN_FILENO);
+        close(commands[cmdIndex].jobs[jobIdx].pipeIn[0]);
+        close(commands[cmdIndex].jobs[jobIdx].pipeIn[1]);
+    }
+
+    if(commands[cmdIndex].jobs[jobIdx].pipeOut != nullptr){
+        dup2( commands[cmdIndex].jobs[jobIdx].pipeOut[1], STDOUT_FILENO);
+        if(commands[cmdIndex].isErrorPipe){
+            dup2(commands[cmdIndex].jobs[jobIdx].pipeOut[1], STDERR_FILENO);
+        }
+        close(commands[cmdIndex].jobs[jobIdx].pipeOut[0]);
+        close(commands[cmdIndex].jobs[jobIdx].pipeOut[1]);
+
+    }
 }
 vector<Command> extractCommand(vector<string> spaceSplit){
     
@@ -128,14 +190,17 @@ vector<Command> extractCommand(vector<string> spaceSplit){
     }    
     return result;
 }
-
+void handleRedirection(char **args, const char* fileName){
+    int fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, S_IREAD | S_IWRITE);
+    dup2(fd, STDOUT_FILENO);
+    close(fd);
+    
+}
 void exec(Job job){
     char **args = new char*[job.arg.size() + 1];
     for(int i = 0; i < job.arg.size(); i++){
         if(job.arg[i] == ">"){
-            int fd = open(job.arg[i + 1].c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IREAD | S_IWRITE);
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
+            handleRedirection(args, job.arg[i + 1].c_str());
             args[i] = nullptr;
             break;
         }
@@ -205,32 +270,8 @@ int run(){
             int numPipeIdx = reviewNumPipe();
             // Command command = commands[cmdIndex];
             //建立number pipe
-            if(commands[cmdIndex].isNumPipe || commands[cmdIndex].isErrorPipe){
-
-                int find = 0;
-                //找現在有沒有相同的number pipe指向同個位置，如果有就用舊的pipe(j-th)即可不用重開
-                for(int numPipesIterator = 0; numPipesIterator < numPipes.size(); numPipesIterator++){
-                    if(numPipes[numPipesIterator].step == commands[cmdIndex].number){
-                        find = 1;
-                        commands[cmdIndex].numPipesOutIdx = numPipesIterator;
-                    }
-                }
-
-                //開number Pipe的pipe
-                if(find == 0){
-                    NumPipe numPipe;
-                    numPipe.pipe = new int[2];
-                    if(pipe(numPipe.pipe) == -1){
-                        perror("pipe failed");
-                        exit(1);
-                    }
-                    numPipe.step = commands[cmdIndex].number;//這個存還有多少輪到我丟出去
-                    numPipes.push_back(numPipe);
-                    commands[cmdIndex].numPipesOutIdx = numPipes.size() - 1;//這個存在numPipes的
-                    commands[cmdIndex].pipeOut = numPipe.pipe;
-                }
-            }
-
+            buildNumberPipe(commands, cmdIndex);
+            
             //Build in
             if(isBuildIn(commands[cmdIndex].jobs[0]))
                 break;
@@ -238,50 +279,19 @@ int run(){
             //Pipe
             int pipeArray[2][2];
             for(int jobIdx = 0; jobIdx < commands[cmdIndex].jobs.size(); jobIdx++){
-                if(jobIdx > 0){
-                    commands[cmdIndex].jobs[jobIdx].pipeIn = pipeArray[(jobIdx - 1) % 2];
-                }
-
-                if(jobIdx != commands[cmdIndex].jobs.size() - 1){
-                    commands[cmdIndex].jobs[jobIdx].pipeOut = pipeArray[jobIdx % 2];
-                    if(pipe(pipeArray[jobIdx % 2]) == -1){
-                        perror("pipe failed");
-                        exit(1);
-                    }
-                }
-
-                if(jobIdx == 0 && numPipeIdx != -1){
-                    commands[cmdIndex].jobs[jobIdx].pipeIn = numPipes[numPipeIdx].pipe;
-                }
-
-                if(jobIdx == commands[cmdIndex].jobs.size() - 1 && (commands[cmdIndex].isNumPipe || commands[cmdIndex].isErrorPipe)){
-                    commands[cmdIndex].jobs[jobIdx].pipeOut = numPipes[commands[cmdIndex].numPipesOutIdx].pipe;
-                }
-            
-
+                setPipe(pipeArray, commands, cmdIndex, jobIdx, numPipeIdx);
+                
                 pid = fork();
                 if(pid < 0){
                     close(pipeArray[jobIdx % 2][0]);
                     close(pipeArray[jobIdx % 2][1]);
                     jobIdx--;
                     continue;
-                }else if(pid == 0){
-                    if(commands[cmdIndex].jobs[jobIdx].pipeIn != nullptr){
-                        dup2 (commands[cmdIndex].jobs[jobIdx].pipeIn[0], STDIN_FILENO);
-                        close(commands[cmdIndex].jobs[jobIdx].pipeIn[0]);
-                        close(commands[cmdIndex].jobs[jobIdx].pipeIn[1]);
-                    }
-
-                    if(commands[cmdIndex].jobs[jobIdx].pipeOut != nullptr){
-                        dup2( commands[cmdIndex].jobs[jobIdx].pipeOut[1], STDOUT_FILENO);
-                        if(commands[cmdIndex].isErrorPipe){
-                            dup2(commands[cmdIndex].jobs[jobIdx].pipeOut[1], STDERR_FILENO);
-                        }
-                        close(commands[cmdIndex].jobs[jobIdx].pipeOut[0]);
-                        close(commands[cmdIndex].jobs[jobIdx].pipeOut[1]);
-
-                    }
+                }else if(pid == 0){//child
+                    //真正對pipe做開關操作
+                    switchPipe(commands, cmdIndex, jobIdx);
                     exec(commands[cmdIndex].jobs[jobIdx]);
+                
                 }else{//pid > 0的情況
 #ifndef CLOSEPIPE
                     cerr << __FILE__ << " " << __LINE__ << " parent 000000" << endl;
