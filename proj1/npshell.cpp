@@ -156,7 +156,7 @@ bool isBuildIn(Job job){
         setenv(job.arg[1].c_str(), job.arg[2].c_str(), 1);
         return true;
     }else if(job.arg[0] == "printenv"){
-        char* r = getenv(job.arg[1].c_str();
+        char* r = getenv(job.arg[1].c_str());
         if(r != nullptr){
             printf("%s\n", r);
         }
