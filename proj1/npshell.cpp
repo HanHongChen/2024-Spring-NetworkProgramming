@@ -14,12 +14,12 @@
 #include <string>
 #include <assert.h>
 #include "Command.cpp"
-//兩個Number pipe有問題
-#define COMMAND
-#define NUMPIPE
-#define CLOSEPIPE
-#define PIPE
-#define DEBUG
+// #define COMMAND
+// #define NUMPIPE
+// #define CLOSEPIPE
+// #define PIPE
+// #define DEBUG
+// #define WAIT
 using namespace std;
 vector<NumPipe> numPipes;
 
@@ -28,10 +28,13 @@ void sigchld_handler(int sig){
     while (waitpid(-1, &status, WNOHANG) > 0) {
         // 處理子進程的退出
         if (WIFEXITED(status)) {
-            
-            //printf("child process ends. return：%d\n", WEXITSTATUS(status));
+#ifndef WAIT
+            printf("child process ends. return：%d\n", WEXITSTATUS(status));
+#endif
         } else if (WIFSIGNALED(status)) {
-            //printf("child process ended by signal. signal：%d\n", WTERMSIG(status));
+#ifndef WAIT    
+            printf("child process ended by signal. signal：%d\n", WTERMSIG(status));
+#endif
         }
     }
 
@@ -59,11 +62,11 @@ int returnNumPipesZeroIdx(){
 int reviewNumPipe(){//因為寫入的時候已經把接到同指令的合併用同個pipe，所以只須考慮不同位置情況
     int idx = -1;
     for(int i = 0; i < numPipes.size(); i++){
-        // assert(numPipes[i].number > 0);//若<=0則有問題
-// #ifndef NUMPIPE
-//         cerr << __FILE__ << " " << __LINE__ << endl;
-//         printf("numPipe[%d] = [%d, %d] is ready\n", i, numPipes[i].pipe[0], numPipes[i].pipe[1]);
-// #endif
+        assert(numPipes[i].step > 0);//若<=0則有問題
+#ifndef NUMPIPE
+        cerr << __FILE__ << " " << __LINE__ << endl;
+        printf("numPipe[%d] = [%d, %d] is ready\n", i, numPipes[i].pipe[0], numPipes[i].pipe[1]);
+#endif
         numPipes[i].step = numPipes[i].step - 1;
         if(numPipes[i].step == 0){//找到不能直接return，後面的也要繼續--才行
             idx = i;
@@ -128,8 +131,6 @@ vector<Command> extractCommand(vector<string> spaceSplit){
 void exec(Job job){
     char **args = new char*[job.arg.size() + 1];
     for(int i = 0; i < job.arg.size(); i++){
-        // if(i > 0)
-        //     cout << "i = " << i - 1 << " " << args[i - 1] << endl << flush;
         if(job.arg[i] == ">"){
             int fd = open(job.arg[i + 1].c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IREAD | S_IWRITE);
             dup2(fd, STDOUT_FILENO);
@@ -141,10 +142,12 @@ void exec(Job job){
         strcpy(args[i], job.arg[i].c_str());
     }
     args[job.arg.size()] = nullptr;
-    // for(int i = 0; args[i] != nullptr; i++){
-    //     cerr << "i = " << i << " " << args[i] << " ";
-    // }
-    // cerr << endl<<flush;
+#ifndef EXEC
+    for(int i = 0; args[i] != nullptr; i++){
+        cerr << "i = " << i << " " << args[i] << " ";
+    }
+    cerr << endl<<flush;
+#endif
     if (execvp(args[0], args) == -1) {
         cerr << "Unknown command: [" << job.arg[0] << "]." << endl;
         exit(-1);
@@ -156,11 +159,11 @@ bool isBuildIn(Job job){
         setenv(job.arg[1].c_str(), job.arg[2].c_str(), 1);
         return true;
     }else if(job.arg[0] == "printenv"){
+        //有可能參數塞不存在則會回傳nullptr，因此需要先判斷
         char* r = getenv(job.arg[1].c_str());
         if(r != nullptr){
             printf("%s\n", r);
         }
-        
         return true;
     }else if(job.arg[0] == "exit"){
         exit(0);
@@ -202,8 +205,6 @@ int run(){
             // Command command = commands[cmdIndex];
             //建立number pipe
             if(commands[cmdIndex].isNumPipe || commands[cmdIndex].isErrorPipe){
-
-
 
                 int find = 0;
                 //找現在有沒有相同的number pipe指向同個位置，如果有就用舊的pipe(j-th)即可不用重開
@@ -265,14 +266,9 @@ int run(){
                     continue;
                 }else if(pid == 0){
                     if(commands[cmdIndex].jobs[jobIdx].pipeIn != nullptr){
-                        // cerr << "commands[i].jobs[j].pipeIn = [" << commands[i].jobs[j].pipeIn[0] << ", " << commands[i].jobs[j].pipeIn[1] << "]" << endl;
                         dup2 (commands[cmdIndex].jobs[jobIdx].pipeIn[0], STDIN_FILENO);
                         close(commands[cmdIndex].jobs[jobIdx].pipeIn[0]);
                         close(commands[cmdIndex].jobs[jobIdx].pipeIn[1]);
-                        // if(commands[i].numberIn != -1){
-                        //     numPipes[commands[i].numberIn].finish = true;
-                        // }
-                        
                     }
 
                     if(commands[cmdIndex].jobs[jobIdx].pipeOut != nullptr){
@@ -297,7 +293,6 @@ int run(){
                     cerr << __FILE__ << " " << __LINE__ << " parent 11111111" << endl;
 #endif
                     if(jobIdx == 0  && numPipeIdx != -1){
-                        // cerr << "closing numbered pipe" << endl;
                         close(numPipes[numPipeIdx].pipe[1]);//關numPipe的寫入端
                         close(numPipes[numPipeIdx].pipe[0]);
                         numPipes.erase(numPipes.begin() + numPipeIdx);
@@ -320,7 +315,7 @@ int main(){
     //預設PATH變數
     setenv("PATH", "bin:.", 1);
 
-    // runCommand();
+    //讀取command;
     run();
     
     return 0;
