@@ -16,8 +16,8 @@
 #include "Command.cpp"
 //兩個Number pipe有問題
 #define NUMPIPE
-// #define CLOSEPIPE
-// #define PIPE
+#define CLOSEPIPE
+#define PIPE
 #define DEBUG
 using namespace std;
 vector<NumPipe> numPipes;
@@ -127,16 +127,23 @@ vector<Command> extractCommand(vector<string> spaceSplit){
 void exec(Job job){
     char **args = new char*[job.arg.size() + 1];
     for(int i = 0; i < job.arg.size(); i++){
+        // if(i > 0)
+        //     cout << "i = " << i - 1 << " " << args[i - 1] << endl << flush;
         if(job.arg[i] == ">"){
             int fd = open(job.arg[i + 1].c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IREAD | S_IWRITE);
             dup2(fd, STDOUT_FILENO);
             close(fd);
+            args[i] = nullptr;
             break;
         }
         args[i] = new char[job.arg[i].size() + 1];
         strcpy(args[i], job.arg[i].c_str());
     }
     args[job.arg.size()] = nullptr;
+    // for(int i = 0; args[i] != nullptr; i++){
+    //     cerr << "i = " << i << " " << args[i] << " ";
+    // }
+    // cerr << endl<<flush;
     if (execvp(args[0], args) == -1) {
         cerr << "Unknown command: [" << job.arg[0] << "]." << endl;
         exit(-1);
