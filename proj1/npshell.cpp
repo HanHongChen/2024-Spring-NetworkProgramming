@@ -15,6 +15,7 @@
 #include <assert.h>
 #include "Command.cpp"
 //兩個Number pipe有問題
+#define COMMAND
 #define NUMPIPE
 #define CLOSEPIPE
 #define PIPE
@@ -24,7 +25,7 @@ vector<NumPipe> numPipes;
 
 void sigchld_handler(int sig){
     int status;
-    while (waitpid(-1, &status, 0) > 0) {
+    while (waitpid(-1, &status, WNOHANG) > 0) {
         // 處理子進程的退出
         if (WIFEXITED(status)) {
             
@@ -152,11 +153,14 @@ void exec(Job job){
 
 bool isBuildIn(Job job){
     if(job.arg[0] == "setenv"){
-        // if(job.arg.size() == 3){
         setenv(job.arg[1].c_str(), job.arg[2].c_str(), 1);
         return true;
     }else if(job.arg[0] == "printenv"){
-        printf("%s\n", getenv(job.arg[1].c_str()));
+        char* r = getenv(job.arg[1].c_str();
+        if(r != nullptr){
+            printf("%s\n", r);
+        }
+        
         return true;
     }else if(job.arg[0] == "exit"){
         exit(0);
@@ -293,7 +297,7 @@ int run(){
                     cerr << __FILE__ << " " << __LINE__ << " parent 11111111" << endl;
 #endif
                     if(jobIdx == 0  && numPipeIdx != -1){
-                        cerr << "closing numbered pipe" << endl;
+                        // cerr << "closing numbered pipe" << endl;
                         close(numPipes[numPipeIdx].pipe[1]);//關numPipe的寫入端
                         close(numPipes[numPipeIdx].pipe[0]);
                         numPipes.erase(numPipes.begin() + numPipeIdx);
