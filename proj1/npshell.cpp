@@ -259,6 +259,9 @@ int run(){
 
                     if(commands[cmdIndex].jobs[jobIdx].pipeOut != nullptr){
                         dup2( commands[cmdIndex].jobs[jobIdx].pipeOut[1], STDOUT_FILENO);
+                        if(commands[cmdIndex].isErrorPipe){
+                            dup2(commands[cmdIndex].jobs[jobIdx].pipeOut[1], STDERR_FILENO);
+                        }
                         close(commands[cmdIndex].jobs[jobIdx].pipeOut[0]);
                         close(commands[cmdIndex].jobs[jobIdx].pipeOut[1]);
 
