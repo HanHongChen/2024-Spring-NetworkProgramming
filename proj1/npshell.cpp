@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <signal.h>
 #include <algorithm>
 #include <fcntl.h>
@@ -126,6 +127,12 @@ vector<Command> extractCommand(vector<string> spaceSplit){
 void exec(Job job){
     char **args = new char*[job.arg.size() + 1];
     for(int i = 0; i < job.arg.size(); i++){
+        if(job.arg[i] == ">"){
+            int fd = open(job.arg[i + 1].c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IREAD | S_IWRITE);
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+            break;
+        }
         args[i] = new char[job.arg[i].size() + 1];
         strcpy(args[i], job.arg[i].c_str());
     }
