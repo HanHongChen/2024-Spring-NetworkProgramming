@@ -20,6 +20,7 @@
 // #define PIPE
 // #define DEBUG
 // #define WAIT
+// #define EXEC
 using namespace std;
 vector<NumPipe> numPipes;
 
