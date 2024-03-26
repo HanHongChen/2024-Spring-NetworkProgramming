@@ -297,6 +297,7 @@ int run(){
                         close(numPipes[numPipeIdx].pipe[1]);//關numPipe的寫入端
                         close(numPipes[numPipeIdx].pipe[0]);
                         numPipes.erase(numPipes.begin() + numPipeIdx);
+                        sleep(1);
                     }
                 }
             }
