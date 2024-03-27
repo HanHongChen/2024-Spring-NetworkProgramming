@@ -17,8 +17,24 @@ struct Job{
     bool isPipe = false;
     int *pipeIn = nullptr;
     int *pipeOut = nullptr;
+    bool hasPipeIn = false;
+    bool hasPipeOut = false;
     vector<string> arg;
 };
+
+// pipe_t pipe = NULL;
+// for (command: commands) {
+//     if (pipe != NULL) {
+//         addRedirect(command, pipe.read, STDIN_FILENO);
+//         pipe = NULL;
+//     }
+
+//     if (command.haspipeout()) {
+//         pipe = create_pipe();
+//         addRedirect(command, pipe.write, STDOUT_FILENO);
+//     }
+// }
+
 class Command {    
 private:
     

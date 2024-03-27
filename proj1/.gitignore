@@ -4,6 +4,7 @@
 #     https://www.atlassian.com/git/tutorials/saving-changes/gitignore
 .gitignore
 pizzaCode.cpp
+chh.code-workspace
 *.out
 *.txt
 # Node artifact files
