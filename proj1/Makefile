@@ -1,21 +1,21 @@
 CXX = g++
 CXXFLAGS = -std=c++11
 
-all: clean npshell.out
+all: clean npshell
 	
-npshell.out: npshell.cpp
-	$(CXX) $(CXXFLAGS) -o npshell.out npshell.cpp
+npshell: npshell.cpp
+	$(CXX) $(CXXFLAGS) -o npshell npshell.cpp
 
 cleanrun: npshell.cpp
-	$(CXX) $(CXXFLAGS) -o npshell.out npshell.cpp -DDEBUG -DPIPE -DNUMPIPE -DCOMMAND -DWAIT -DCLOSEPIPE -DEXEC
+	$(CXX) $(CXXFLAGS) -o npshell npshell.cpp -DDEBUG -DPIPE -DNUMPIPE -DCOMMAND -DWAIT -DCLOSEPIPE -DEXEC
 
-run: npshell.out
-	./npshell.out
+run: npshell
+	./npshell
 
 debug: clean
-	$(CXX) $(CXXFLAGS) -g -o npshell.out npshell.cpp
+	$(CXX) $(CXXFLAGS) -g -o npshell npshell.cpp
 
 gdb: debug
-	gdb npshell.out
+	gdb npshell
 clean:
-	rm -f npshell.out
+	rm -f npshell
