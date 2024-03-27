@@ -17,12 +17,12 @@
 // #include "util.cpp"
 // #include "Command.h"
 // #include "util.h"
-// #define COMMAND
-// #define NUMPIPE
-// #define CLOSEPIPE
-// #define PIPE
-// #define DEBUG
-// #define WAIT
+#define COMMAND
+#define NUMPIPE
+#define CLOSEPIPE
+#define PIPE
+#define DEBUG
+#define WAIT
 // #define EXEC
 using namespace std;
 vector<NumPipe> numPipes;
@@ -105,6 +105,7 @@ void setPipe(int* &fd, vector<Command> &commands, int cmdIndex, int jobIdx, int 
         commands[cmdIndex].jobs[jobIdx].hasPipeIn = true;
         commands[cmdIndex].jobs[jobIdx].pipeIn = fd;
     }
+    //normal pipe的輸出
     if(commands[cmdIndex].jobs[jobIdx].isPipe){
         fd = new int[2];
         if(pipe(fd) == -1){
@@ -116,17 +117,7 @@ void setPipe(int* &fd, vector<Command> &commands, int cmdIndex, int jobIdx, int 
     }else{
         fd = nullptr;
     }
-    // if(jobIdx > 0){
-    //     commands[cmdIndex].jobs[jobIdx].pipeIn = pipeArray[(jobIdx - 1) % 2];
-    // }
-    // //normal pipe的輸出
-    // if(jobIdx != commands[cmdIndex].jobs.size() - 1){
-    //     commands[cmdIndex].jobs[jobIdx].pipeOut = pipeArray[jobIdx % 2];
-    //     if(pipe(pipeArray[jobIdx % 2]) == -1){
-    //         perror("pipe failed");
-    //         exit(1);
-    //     }
-    // }
+
     //number pipe的輸入
     if(jobIdx == 0 && numPipeIdx != -1){
         commands[cmdIndex].jobs[jobIdx].pipeIn = numPipes[numPipeIdx].pipe;
@@ -211,7 +202,7 @@ void handleRedirection(char **args, const char* fileName){
     close(fd);
     
 }
-void exec(Job job){
+void exec(Job job, int jobIdx){
     char **args = new char*[job.arg.size() + 1];
     for(int i = 0; i < job.arg.size(); i++){
         if(job.arg[i] == ">"){
@@ -225,6 +216,9 @@ void exec(Job job){
     args[job.arg.size()] = nullptr;
 #ifndef EXEC
     for(int i = 0; args[i] != nullptr; i++){
+        if(i == 1){
+            cerr << jobIdx << "出現i = 1 =" << args[i] << "確認是否為空格" <<endl;
+        }
         cerr << "i = " << i << " " << args[i] << " ";
     }
     cerr << endl<<flush;
@@ -283,7 +277,6 @@ int run(){
         int pid;
         for(int cmdIndex = 0; cmdIndex < commands.size(); cmdIndex++){
             int numPipeIdx = reviewNumPipe();
-            // Command command = commands[cmdIndex];
             //建立number pipe
             buildNumberPipe(commands, cmdIndex);
             
@@ -292,35 +285,30 @@ int run(){
                 break;
 
             //Pipe
-            // int pipeArray[2][2];
             int *fd = nullptr;
             for(int jobIdx = 0; jobIdx < commands[cmdIndex].jobs.size(); jobIdx++){
                 setPipe(fd, commands, cmdIndex, jobIdx, numPipeIdx);
-                
-                pid = fork();
-                if(pid < 0){
-                    // close(pipeArray[jobIdx % 2][0]);
-                    // close(pipeArray[jobIdx % 2][1]);
-                    // jobIdx--;
-                    // continue;
-                    cerr << "fork failed" << endl;
-                }else if(pid == 0){//child
+                pid_t pid;
+                //如果進入迴圈表示fork失敗，則持續等待，如果跳出迴圈表示有成功fork
+                while((pid = fork() ) < 0) {
+                    //第一個參數表示等誰,-1表示任何child,第二個參數表示存放狀態
+                    //第三個參數表示選項,0表示一定要等到有child結束為止，WNOHANG表示等執行當下沒有可回收的child就離開，有就回收一個後離開
+                    waitpid(-1, NULL, 0);
+                }
+                if(pid == 0){//child
                     //真正對pipe做開關操作
                     switchPipe(commands, cmdIndex, jobIdx);
-                    exec(commands[cmdIndex].jobs[jobIdx]);
+                    exec(commands[cmdIndex].jobs[jobIdx], jobIdx);
                 
                 }else{//pid > 0的情況
 #ifndef CLOSEPIPE
                     cerr << __FILE__ << " " << __LINE__ << " parent 000000" << endl;
 #endif
-                    // if (jobIdx > 0){
-                        if(commands[cmdIndex].jobs[jobIdx].hasPipeIn ){
-                            close(commands[cmdIndex].jobs[jobIdx].pipeIn[0]);
-                            close(commands[cmdIndex].jobs[jobIdx].pipeIn[1]);
-                        }
-                        // close(pipeArray[(jobIdx - 1) % 2][0]);
-                        // close(pipeArray[(jobIdx - 1) % 2][1]);
-                    // }
+                    if(commands[cmdIndex].jobs[jobIdx].hasPipeIn ){
+                        close(commands[cmdIndex].jobs[jobIdx].pipeIn[0]);
+                        close(commands[cmdIndex].jobs[jobIdx].pipeIn[1]);
+                    }
+                        
 #ifndef CLOSEPIPE
                     cerr << __FILE__ << " " << __LINE__ << " parent 11111111" << endl;
 #endif
