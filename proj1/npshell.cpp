@@ -14,16 +14,13 @@
 #include <string>
 #include <assert.h>
 #include "Command.cpp"
-// #include "util.cpp"
-// #include "Command.h"
-// #include "util.h"
 #define COMMAND
 #define NUMPIPE
 #define CLOSEPIPE
 #define PIPE
 #define DEBUG
 #define WAIT
-// #define EXEC
+#define EXEC
 using namespace std;
 vector<NumPipe> numPipes;
 
@@ -316,12 +313,13 @@ int run(){
                         close(numPipes[numPipeIdx].pipe[1]);//關numPipe的寫入端
                         close(numPipes[numPipeIdx].pipe[0]);
                         numPipes.erase(numPipes.begin() + numPipeIdx);
-                        sleep(1);
                     }
                 }
             }
             if(!(commands[cmdIndex].isNumPipe || commands[cmdIndex].isErrorPipe)){
                 while (wait(NULL) > 0);
+            } else {
+                sleep(1);
             }
             
         }

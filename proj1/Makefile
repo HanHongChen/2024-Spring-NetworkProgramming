@@ -4,6 +4,9 @@ CXXFLAGS = -std=c++11
 all: clean npshell.out
 	
 npshell.out: npshell.cpp
+	$(CXX) $(CXXFLAGS) -o npshell.out npshell.cpp
+
+cleanrun: npshell.cpp
 	$(CXX) $(CXXFLAGS) -o npshell.out npshell.cpp -DDEBUG -DPIPE -DNUMPIPE -DCOMMAND -DWAIT -DCLOSEPIPE -DEXEC
 
 run: npshell.out
