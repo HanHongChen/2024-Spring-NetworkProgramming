@@ -28,7 +28,7 @@ private:
 public:
     bool isErrorPipe = false;
     bool isNumPipe = false; //確認是否為number pipe
-    int number = -1;
+    int number = -1;//若為number pipe，則存number pipe的數字 i.e. |number
     int numPipesOutIdx = -1; //若為nuber pipe，則number為存入NumPipe的index，即NumPipes的第i個是這個的pipe
     int numPipesInIdx = -1; //若為number pipe，則numberIn為存入NumPipe的index，即NumPipes的第i個是這個的pipe
     vector<Job> jobs; //指令，用|N or | or !分割的

@@ -193,8 +193,12 @@ vector<Command> extractCommand(vector<string> spaceSplit){
     }    
     return result;
 }
-void handleRedirection(char **args, const char* fileName){
-    int fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, S_IREAD | S_IWRITE);
+void handleRedirection(char **args, const char* fileName, bool isAppend){
+    int fd;
+    if(!isAppend)
+        fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, S_IREAD | S_IWRITE);
+    else
+        fd = open(fileName, O_WRONLY | O_CREAT | O_APPEND, S_IREAD | S_IWRITE);
     dup2(fd, STDOUT_FILENO);
     close(fd);
     
@@ -203,7 +207,11 @@ void exec(Job job, int jobIdx){
     char **args = new char*[job.arg.size() + 1];
     for(int i = 0; i < job.arg.size(); i++){
         if(job.arg[i] == ">"){
-            handleRedirection(args, job.arg[i + 1].c_str());
+            handleRedirection(args, job.arg[i + 1].c_str(), false);
+            args[i] = nullptr;
+            break;
+        }else if(job.arg[i] == ">>"){
+            handleRedirection(args, job.arg[i + 1].c_str(), true);
             args[i] = nullptr;
             break;
         }
