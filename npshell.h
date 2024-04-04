@@ -41,8 +41,8 @@ void sigchld_handler(int sig){
 
 }
 vector<string> split(string str, string delimiter){
-    // if(str[str.length() - 1] == '\r')
-    //     str[str.length() - 1] = '\0';
+    if(str[str.length() - 1] == '\r')
+        str[str.length() - 1] = '\0';
     vector<string> result;
     size_t pos = 0;
     string token;
@@ -250,18 +250,18 @@ void exec(Job job, int jobIdx){
 }
 
 bool isBuildIn(Job job){
-    printf("job.arg[0] = %s\n", job.arg[0].c_str());
-    bool fl = job.arg[0] == "printenv";
-    cout << "是否相等" << fl << endl << flush;
+    // printf("job.arg[0] = %s\n", job.arg[0].c_str());
+    // bool fl = job.arg[0] == "printenv";
+    // cout << "是否相等" << fl << endl << flush;
     if(job.arg[0] == "setenv"){
         setenv(job.arg[1].c_str(), job.arg[2].c_str(), 1);
         return true;
     }else if(job.arg[0] == "printenv"){
         //有可能參數塞不存在則會回傳nullptr，因此需要先判斷
         char* r = getenv(job.arg[1].c_str());
-        cout << "getenv = " << job.arg[1].c_str() << endl;
-        cout << getenv("PATH") << std::endl;
-        cout << "getenv = " << flush << getenv(job.arg[1].c_str()) << std::endl;
+        // cout << "getenv = " << job.arg[1].c_str() << endl;
+        // cout << getenv("PATH") << std::endl;
+        // cout << "getenv = " << flush << getenv(job.arg[1].c_str()) << std::endl;
         if(r != nullptr){
             printf("%s\n", r);
         }
